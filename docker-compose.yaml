@@ -1,0 +1,14 @@
+services:
+  api:
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGCHAIN_TRACING_V2=true
+      - LANGCHAIN_ENDPOINT="https://api.langchain.com"
+      - LANGCHAIN_PROJECT="VA-CODEXCA"
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+
+    restart: on-failure
