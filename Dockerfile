@@ -3,8 +3,6 @@ LABEL authors="Arturo Ortiz"
 
 WORKDIR /app
 
-
-
 RUN apt-get update && apt-get install -y \
     build-essential \
     software-properties-common \
@@ -21,6 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
 
-EXPOSE 8000
+EXPOSE 80
 
 ENTRYPOINT ["fastapi", "run", "main.py", "--port", "80"]
