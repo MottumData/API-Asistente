@@ -19,8 +19,9 @@ load_dotenv()
 app = FastAPI()
 
 origins = [
-    "http://localhost",
     "http://localhost:80",
+    "http://localhost:8000",
+    "http://localhost:3000"
 ]
 
 app.add_middleware(
@@ -45,4 +46,4 @@ def ping():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=80)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
