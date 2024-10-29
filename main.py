@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Carga de las variables de entorno
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="API de Asistente de IA de Codexca", version="0.0.1")
 
 origins = [
     "http://localhost:80",
@@ -35,7 +35,7 @@ app.add_middleware(
 app.include_router(chat.router)
 
 
-@app.get("/ping")
+@app.get("/")
 def ping():
     """
     Endpoint para verificar el estado de la API.
