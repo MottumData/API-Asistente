@@ -7,7 +7,8 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import chat
+from .routers import chat, rag_utils
+
 
 # Configuración del logger
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,7 @@ app.add_middleware(
 )
 
 app.include_router(chat.router)
+app.include_router(rag_utils.router)
 
 
 @app.get("/")
