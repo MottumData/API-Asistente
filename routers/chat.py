@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 class Message(BaseModel):
     """Modelo para los mensajes de chat."""
     role: str  # El rol del mensaje, puede ser "human" o "system"
@@ -107,7 +108,8 @@ def get_response_langchain(prompt: str, stream=False):
 async def test_chat(message: Message, stream: bool = Query(False)):
     """Endpoint para probar la funcionalidad de chat."""
     if stream:
-        return StreamingResponse(get_response_langchain(prompt=message.content, stream=stream), media_type="text/plain")
+        return StreamingResponse(get_response_langchain(prompt=message.content, stream=stream),
+                                 media_type="text/plain")
     else:
         response = get_response_langchain(prompt=message.content)
         return Message(role="ai", content=response, timestamp=datetime.now())
@@ -159,5 +161,6 @@ def get_chat_trace(session_id: str):
     if session_id not in conversations:
         conversations[session_id] = InMemoryChatMessageHistory()
         logger.info(
-            "No se encontró historial de mensajes para la conversación %s. Creando una nueva.", session_id)
+            "No se encontró historial de mensajes para la conversación %s. Creando una nueva.",
+            session_id)
     return conversations[session_id]

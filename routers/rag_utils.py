@@ -1,3 +1,5 @@
+""" Módulo para la funcionalidad del RAG."""
+
 import os
 from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import JSONResponse
@@ -10,7 +12,8 @@ router = APIRouter()
 async def upload_pdf(file: UploadFile = File(...)):
     """Endpoint para subir un archivo PDF."""
     if not file.filename.endswith(".pdf"):
-        return JSONResponse(content={"error": "Únicamente se pueden adjuntar archivos PDF"}, status_code=400)
+        return JSONResponse(content={"error": "Únicamente se pueden adjuntar archivos PDF"},
+                            status_code=400)
 
     directory = "rag_documents"
 
@@ -21,5 +24,13 @@ async def upload_pdf(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    return JSONResponse(content={"message": "Documento subido correctamente", "filename": file.filename})
+    return JSONResponse(content={"message": "Documento subido correctamente",
+                                 "filename": file.filename})
 
+
+@router.get("/list-documents/")
+async def list_documents():
+    """Endpoint para listar los documentos en el RAG."""
+    directory = "rag_documents"
+    documents = os.listdir(directory)
+    return JSONResponse(content={"documents": documents})
