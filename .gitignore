@@ -311,3 +311,5 @@ pyrightconfig.json
 ## Mottum
 rag_documents/*
 !rag_documents/.gitkeep
+chroma_db/*
+chroma_db/
