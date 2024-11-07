@@ -5,8 +5,7 @@ import logging
 
 from typing import Dict
 from datetime import datetime
-from fastapi import HTTPException, APIRouter, Query
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -56,63 +55,6 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
     if session_id not in conversations:
         conversations[session_id] = InMemoryChatMessageHistory()
     return conversations[session_id]
-
-
-def get_response_langchain(prompt: str, stream=False):
-    """Función básica que obtiene una respuesta desde Langchain."""
-    if not prompt:
-        prompt = "Dime un como puedes ayudarme"
-
-    system_prompt = (
-        '''
-        Eres un asistente de inteligencia artificial para gestión documental y 
-        redacción en la empresa Codexca. Ayuda a los usuarios principiantes a buscar 
-        información en documentos y redactar contenido nuevo de forma profesional, 
-        con un tono amable y accesible.
-
-        Búsqueda de información: Encuentra y resume información clave 
-        en documentos según lo solicitado.
-        Redacción: Genera borradores claros y profesionales.
-        Soporte: Explica cada paso de forma sencilla y evita términos técnicos 
-        innecesarios.
-        Mantén un tono profesional y empático, promoviendo una 
-        interacción fluida y accesible.
-        También responderás a todo tipo de preguntas aunque no estén relacionadas con el tema.
-        '''
-    )
-    qa_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            ("human", f"{prompt}"),
-            MessagesPlaceholder(variable_name='history'),
-        ]
-    )
-
-    logger.info("Obteniendo respuesta desde Langchain para el mensaje: %s",
-                qa_prompt.format_messages())
-    try:
-        chain = qa_prompt | llm
-        conversation_chain = RunnableWithMessageHistory(
-            chain, get_session_history, output_messages_key="response")
-        response = conversation_chain.invoke({'input': prompt}, stream=stream)
-        # for chunk in response:
-        #     yield text_chunk
-        return response.content
-    except Exception as e:
-        logger.error("Error al obtener la respuesta desde Langchain: %s", e)
-        raise HTTPException(
-            status_code=500, detail="Error al procesar la solicitud.") from e
-
-
-@router.post("/test_chat/")
-async def test_chat(message: Message, stream: bool = Query(False)):
-    """Endpoint para probar la funcionalidad de chat."""
-    if stream:
-        return StreamingResponse(get_response_langchain(prompt=message.content, stream=stream),
-                                 media_type="text/plain")
-    else:
-        response = get_response_langchain(prompt=message.content)
-        return Message(role="ai", content=response, timestamp=datetime.now())
 
 
 @router.post("/chat/")
