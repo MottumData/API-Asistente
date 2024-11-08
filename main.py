@@ -33,9 +33,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(chat.router)
-app.include_router(rag_utils.router)
-
 
 @app.get("/")
 def ping():
@@ -45,6 +42,10 @@ def ping():
     """
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return {"Status": "API is running", "Time": current_time}
+
+
+app.include_router(chat.router)
+app.include_router(rag_utils.router)
 
 
 if __name__ == "__main__":
