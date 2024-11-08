@@ -5,3 +5,4 @@ Este módulo define constantes para las rutas de directorios utilizadas en la ap
 RAG_DIR = "rag_documents"
 
 CHROMA_DB = "chroma_db"
+CHROMA_COLLECTION = "documents"
