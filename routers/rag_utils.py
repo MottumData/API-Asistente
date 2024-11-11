@@ -107,9 +107,20 @@ def list_documents_chroma():
         name=CHROMA_COLLECTION, embedding_function=embedding)
 
     all_data = col.get(
-        include=["documents", "metadatas"],
+        include=["metadatas"],
     )
-    return all_data
+
+    sources = {}
+    for meta in all_data['metadatas']:
+        source = meta.get('source')
+        num_pages = meta.get('page', 0)
+        if source not in sources:
+            sources[source] = {"chunks": 0, "num_pages": num_pages}
+        sources[source]["chunks"] += 1
+        if num_pages > sources[source]["num_pages"]:
+            sources[source]["num_pages"] = num_pages
+
+    return sources
 
 
 @router.post("/upload-pdf/")
