@@ -132,7 +132,7 @@ async def chat_rag_endpoint(request: ChatRequest):
     contextualize_q_system_prompt = """Given a chat history and the latest user question \
         which might reference context in the chat history or not, formulate a standalone question \
         which can be understood without the chat history. If the user make reference \ 
-        to documents, you have to reformulate the question to obtain the maximum documents.
+        to documents, you have to reformulate the question to obtain the maximum documents. \
         Do NOT answer the question, \
         just reformulate it if needed and otherwise return it as is."""
 
@@ -154,7 +154,8 @@ async def chat_rag_endpoint(request: ChatRequest):
         Assist beginner users in searching for information in \
         documents and creating new content professionally, with a friendly and accessible tone. \
 
-        Information Search: Locate and summarize key information in documents as requested.
+        Information Search: Locate and summarize key information in documents as requested. It's \
+        important to provide the source of the information or the date of the document. \
 
         Writing: Generate clear, professional drafts.
 
@@ -162,7 +163,7 @@ async def chat_rag_endpoint(request: ChatRequest):
 
         Maintain a professional and empathetic tone, promoting smooth and accessible interactions.
 
-        You will also respond to all types of questions based on your knowledge base. 
+        You will also respond to all types of questions based on your knowledge base like ChatGPT. 
         
         {context}"""
 
@@ -190,8 +191,6 @@ async def chat_rag_endpoint(request: ChatRequest):
 
     response = conversation_rag_chain.invoke(
         {'input': user_input}, config=config)
-    print(response)
-    # TODO - Devolver en la respuesta, la fuente consultada.
     return ChatResponse(
         response=response['answer'],
         conversation_id=conversation_id,
