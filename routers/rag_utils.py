@@ -18,7 +18,8 @@ from ..internal.path_utils import (
     CHROMA_DB,
     CHROMA_COLLECTION,
     STRUCTURE_DIRECTORY,
-    STRUCTURE_FILE
+    STRUCTURE_FILE,
+    ALLOWED_EXTENSIONS
 )
 
 
@@ -48,7 +49,11 @@ def insert_document_chroma(file_path: str):
     """Función para insertar un documento en la base de datos de Chroma."""
 
     embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
+        model="text-embedding-3-smalls", api_key=os.getenv("OPENAI_API_KEY"))
+
+    if not any(file_path.endswith(ext) for ext in ALLOWED_EXTENSIONS):
+        raise ValueError(
+            "El archivo debe tener una de las siguientes extensiones: PDF, JSON o TXT")
     loader = None
     if file_path.endswith(".json"):
         loader = JSONLoader(file_path=file_path, jq_schema=".[] | .[]")
@@ -176,8 +181,7 @@ def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY, extension: str = ".t
 @router.post("/upload-file/")
 async def upload_file(file: UploadFile = File(...)):
     """Endpoint para subir un archivo PDF, JSON o TXT."""
-    allowed_extensions = [".pdf", ".json", ".txt"]
-    if not any(file.filename.endswith(ext) for ext in allowed_extensions):
+    if not any(file.filename.endswith(ext) for ext in ALLOWED_EXTENSIONS):
         raise HTTPException(
             status_code=400, detail="Únicamente se pueden adjuntar archivos PDF, JSON o TXT")
 
@@ -244,7 +248,7 @@ async def list_chroma_documents():
 @router.get("/structure/")
 async def get_structure(extension: str = "txt"):
     """Endpoint para obtener la estructura de directorios y archivos para el RAG en TXT o JSON. """
-    if extension not in ["txt", "json"]:
+    if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400, detail="La extensión debe ser .txt o .json")
     save_dir_structure(extension=extension)
