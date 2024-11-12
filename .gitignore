@@ -313,3 +313,4 @@ rag_documents/*
 !rag_documents/.gitkeep
 chroma_db/*
 chroma_db/
+00_simulación_rag/*
