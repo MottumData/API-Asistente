@@ -127,11 +127,11 @@ async def chat_rag_endpoint(request: ChatRequest):
     user_input = request.prompt
     config = {'configurable': {'session_id': conversation_id}}
     retriever = vector_store.as_retriever(
-        search_kwargs={"k": 2}, search_type="similarity")
+        search_kwargs={"k": 5}, search_type="similarity")
 
     contextualize_q_system_prompt = """Given a chat history and the latest user question \
         which might reference context in the chat history or not, formulate a standalone question \
-        which can be understood without the chat history. If the user make reference \ 
+        which can be understood without the chat history. If the user make reference \
         to documents, you have to reformulate the question to obtain the maximum documents. \
         Do NOT answer the question, \
         just reformulate it if needed and otherwise return it as is."""
@@ -150,7 +150,7 @@ async def chat_rag_endpoint(request: ChatRequest):
     )
 
     qa_system_prompt = """You are an AI assistant for document management and writing \
-        in the company Codexca. Your name is Chany so people called you Chany.\ 
+        in the company Codexca. Your name is Chany so people called you Chany. \ 
         Assist beginner users in searching for information in \
         documents and creating new content professionally, with a friendly and accessible tone. \
 
