@@ -241,7 +241,7 @@ async def list_chroma_documents():
     return JSONResponse(content={"documents": documents})
 
 
-@router.get("/get-structure/")
+@router.get("/structure/")
 async def get_structure(extension: str = "txt"):
     """Endpoint para obtener la estructura de directorios y archivos para el RAG en TXT o JSON. """
     if extension not in ["txt", "json"]:
