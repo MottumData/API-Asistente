@@ -1,10 +1,11 @@
 """ Módulo para la funcionalidad del RAG."""
 
 import os
+import json
 import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, JSONLoader, TextLoader
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 import chromadb
@@ -12,7 +13,13 @@ from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 
-from ..internal.path_utils import RAG_DIR, CHROMA_DB, CHROMA_COLLECTION
+from ..internal.path_utils import (
+    RAG_DIR,
+    CHROMA_DB,
+    CHROMA_COLLECTION,
+    STRUCTURE_DIRECTORY,
+    STRUCTURE_FILE
+)
 
 
 load_dotenv()
@@ -42,14 +49,31 @@ def insert_document_chroma(file_path: str):
 
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
+    loader = None
+    if file_path.endswith(".json"):
+        loader = JSONLoader(file_path=file_path, jq_schema=".[] | .[]")
+    elif file_path.endswith(".pdf"):
+        loader = PyPDFLoader(file_path=file_path)
+    elif file_path.endswith(".txt"):
+        loader = TextLoader(file_path=file_path, encoding="utf-8")
 
-    loader = PyPDFLoader(file_path=file_path)
     doc_data = loader.load()
 
     splitter = RecursiveCharacterTextSplitter(
-        separators=["\n\n", "\n", " ", ""],
-        chunk_size=300,
+        separators=[
+            "\n\n",
+            "\n",
+            " ",
+            ".",
+            ",",
+            "\u200b",  # Zero-width space
+            "\uff0c",  # Full width comma
+            "\uff0e",  # Full width full stop
+            "",
+        ],
+        chunk_size=400,
         chunk_overlap=50,
+        add_start_index=True,
     )
 
     docs = splitter.split_documents(doc_data)
@@ -123,12 +147,39 @@ def list_documents_chroma():
     return sources
 
 
-@router.post("/upload-pdf/")
-async def upload_pdf(file: UploadFile = File(...)):
-    """Endpoint para subir un archivo PDF."""
-    if not file.filename.endswith(".pdf"):
+def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY, extension: str = ".txt"):
+    """Guarda la estructura de directorios en un archivo de texto o JSON."""
+    if extension == '.txt':
+        with open(STRUCTURE_FILE, 'w', encoding='utf-8') as f:
+            for dirpath, _, filenames in os.walk(root_dir):
+                if filenames:
+                    for filename in filenames:
+                        file_path = os.path.join(dirpath, filename)
+                        f.write(f"{file_path}\n")
+                else:
+                    f.write(f"{dirpath}:\n")
+    elif extension == '.json':
+        directory_structure = {}
+        for dirpath, _, filenames in os.walk(root_dir):
+            relative_path = os.path.relpath(dirpath, root_dir)
+            if filenames:
+                directory_structure[relative_path] = filenames
+            else:
+                directory_structure[relative_path] = []
+
+        with open(STRUCTURE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(directory_structure, f, ensure_ascii=False, indent=4)
+    logger.info("Estructura de directorios guardada en %s", STRUCTURE_FILE)
+    insert_document_chroma(STRUCTURE_FILE)
+
+
+@router.post("/upload-file/")
+async def upload_file(file: UploadFile = File(...)):
+    """Endpoint para subir un archivo PDF, JSON o TXT."""
+    allowed_extensions = [".pdf", ".json", ".txt"]
+    if not any(file.filename.endswith(ext) for ext in allowed_extensions):
         raise HTTPException(
-            status_code=400, detail="Únicamente se pueden adjuntar archivos PDF")
+            status_code=400, detail="Únicamente se pueden adjuntar archivos PDF, JSON o TXT")
 
     file_path = os.path.join(RAG_DIR, file.filename)
     if os.path.exists(file_path):
@@ -136,8 +187,8 @@ async def upload_pdf(file: UploadFile = File(...)):
             status_code=400, detail="El documento ya está en el RAG")
 
     try:
-        save_file(file, RAG_DIR)
-        insert_document_chroma(file_path)
+        save_file(file, RAG_DIR)  # Guardar el archivo en el directorio
+        insert_document_chroma(file_path)  # Insertar el documento en ChromaDB
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error al guardar el archivo: {str(e)}") from e
@@ -159,7 +210,8 @@ async def list_documents():
 
 @router.delete("/delete-document/")
 async def delete_pdf(filename: str):
-    """Endpoint para eliminar un documento del directorio que alimenta al RAG."""
+    """Endpoint para eliminar un documento del directorio que alimenta al RAG. 
+    También elimina el documento de ChromaDB."""
     file_path = os.path.join(RAG_DIR, filename)
 
     if not os.path.exists(file_path):
@@ -167,8 +219,8 @@ async def delete_pdf(filename: str):
             status_code=404, detail="El documento no existe en el RAG")
 
     try:
-        delete_file(file_path)
-        delete_document_chroma(file_path)
+        delete_file(file_path)  # Eliminar el archivo del directorio
+        delete_document_chroma(file_path)  # Eliminar el documento de ChromaDB
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error al eliminar el archivo: {str(e)}") from e
@@ -187,3 +239,15 @@ async def list_chroma_documents():
             status_code=500, detail=f"Error al listar los documentos: {str(e)}") from e
 
     return JSONResponse(content={"documents": documents})
+
+
+@router.get("/get-structure/")
+async def get_structure(extension: str = "txt"):
+    """Endpoint para obtener la estructura de directorios y archivos para el RAG en TXT o JSON. """
+    if extension not in ["txt", "json"]:
+        raise HTTPException(
+            status_code=400, detail="La extensión debe ser .txt o .json")
+    save_dir_structure(extension=extension)
+    with open(STRUCTURE_FILE, 'r', encoding='utf-8') as f:
+        structure = f.read()
+    return JSONResponse(content={"structure": structure})
