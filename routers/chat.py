@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 from ..internal.path_utils import CHROMA_DB, CHROMA_COLLECTION
+from ..internal.prompt_utils import load_prompt
 
 load_dotenv()
 
@@ -75,23 +76,7 @@ async def chat_history_endpoint(request: ChatRequest):
 
     conversation_id = request.conversation_id
     user_input = request.prompt
-    system_prompt = (
-        '''
-        Eres un asistente de inteligencia artificial para gestión documental y 
-        redacción en la empresa Codexca. Ayuda a los usuarios principiantes a buscar 
-        información en documentos y redactar contenido nuevo de forma profesional, 
-        con un tono amable y accesible.
-
-        Búsqueda de información: Encuentra y resume información clave 
-        en documentos según lo solicitado.
-        Redacción: Genera borradores claros y profesionales.
-        Soporte: Explica cada paso de forma sencilla y evita términos técnicos 
-        innecesarios.
-        Mantén un tono profesional y empático, promoviendo una 
-        interacción fluida y accesible.
-        También responderás a todo tipo de preguntas aunque no estén relacionadas con el tema.
-        '''
-    )
+    system_prompt = load_prompt(prompt_name='system_prompt_for_chat')
     config = {'configurable': {'session_id': conversation_id}}
 
     qa_prompt = ChatPromptTemplate.from_messages(
@@ -129,12 +114,8 @@ async def chat_rag_endpoint(request: ChatRequest):
     retriever = vector_store.as_retriever(
         search_kwargs={"k": 5}, search_type="similarity")
 
-    contextualize_q_system_prompt = """Given a chat history and the latest user question \
-        which might reference context in the chat history or not, formulate a standalone question \
-        which can be understood without the chat history. If the user make reference \
-        to documents, you have to reformulate the question to obtain the maximum documents. \
-        Do NOT answer the question, \
-        just reformulate it if needed and otherwise return it as is."""
+    contextualize_q_system_prompt = load_prompt(
+        prompt_name='contextualize_question_prompt')
 
     contextualize_q_prompt = ChatPromptTemplate.from_messages(
         [
@@ -149,23 +130,7 @@ async def chat_rag_endpoint(request: ChatRequest):
         llm, retriever, contextualize_q_prompt
     )
 
-    qa_system_prompt = """You are an AI assistant for document management and writing \
-        in the company Codexca. Your name is Chany so people called you Chany. \ 
-        Assist beginner users in searching for information in \
-        documents and creating new content professionally, with a friendly and accessible tone. \
-
-        Information Search: Locate and summarize key information in documents as requested. It's \
-        important to provide the source of the information or the date of the document. \
-
-        Writing: Generate clear, professional drafts.
-
-        Support: Explain each step simply, avoiding unnecessary technical jargon.
-
-        Maintain a professional and empathetic tone, promoting smooth and accessible interactions.
-
-        You will also respond to all types of questions based on your knowledge base like ChatGPT. 
-        
-        {context}"""
+    qa_system_prompt = load_prompt(prompt_name='qa_system_prompt')
 
     qa_prompt = ChatPromptTemplate.from_messages(
         [
