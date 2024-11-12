@@ -6,6 +6,7 @@ import logging
 from typing import Dict, List
 from datetime import datetime
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -72,7 +73,8 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
 
 @router.get("/prompt/")
 def get_prompt(prompt_name: str = None):
-    """Función para obtener un prompt específico. Si no se especifica un nombre, muestra todos los prompts."""
+    """Función para obtener un prompt específico. Si no se especifica un nombre, 
+        muestra todos los prompts."""
     return show_prompt(prompt_name=prompt_name) if prompt_name else show_prompt()
 
 
@@ -101,13 +103,23 @@ async def chat_history_endpoint(request: ChatRequest):
 
 
 @router.get("/chat_trace/")
-def get_chat_trace(session_id: str):
+def get_chat_trace(session_id: str, prettier: bool = False):
     """Función para obtener el historial de mensajes de una conversación."""
     if session_id not in conversations:
         conversations[session_id] = InMemoryChatMessageHistory()
         logger.info(
             "No se encontró historial de mensajes para la conversación %s. Creando una nueva.",
             session_id)
+    if prettier:
+        formatted_history = []
+        for message in conversations[session_id].messages:
+            role = "Humano" if message.type == "human" else "Chany"
+            formatted_message = {
+                "role": role,
+                "content": message.content,
+            }
+            formatted_history.append(formatted_message)
+        return JSONResponse(content={"messages": formatted_history})
     return conversations[session_id]
 
 
