@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 from ..internal.path_utils import CHROMA_DB, CHROMA_COLLECTION
-from ..internal.prompt_utils import load_prompt
+from ..internal.prompt_utils import load_prompt, show_prompt
 
 load_dotenv()
 
@@ -68,6 +68,12 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
     if session_id not in conversations:
         conversations[session_id] = InMemoryChatMessageHistory()
     return conversations[session_id]
+
+
+@router.get("/prompt/")
+def get_prompt(prompt_name: str = None):
+    """Función para obtener un prompt específico. Si no se especifica un nombre, muestra todos los prompts."""
+    return show_prompt(prompt_name=prompt_name) if prompt_name else show_prompt()
 
 
 @router.post("/chat/")
