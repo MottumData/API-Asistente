@@ -6,7 +6,9 @@ import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from langchain_community.document_loaders import PyPDFLoader, JSONLoader, TextLoader
-from langchain_openai import OpenAIEmbeddings
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
@@ -47,22 +49,27 @@ def delete_file(file_path: str) -> None:
 
 def insert_document_chroma(file_path: str):
     """Función para insertar un documento en la base de datos de Chroma."""
-
+    # TODO - Generación de metadatos solo disponible para PDF por el momento.
     embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-smalls", api_key=os.getenv("OPENAI_API_KEY"))
+        model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
 
     if not any(file_path.endswith(ext) for ext in ALLOWED_EXTENSIONS):
         raise ValueError(
             "El archivo debe tener una de las siguientes extensiones: PDF, JSON o TXT")
     loader = None
+    metadata = None
     if file_path.endswith(".json"):
         loader = JSONLoader(file_path=file_path, jq_schema=".[] | .[]")
     elif file_path.endswith(".pdf"):
         loader = PyPDFLoader(file_path=file_path)
+        metadata = generate_metadata(loader.load())
     elif file_path.endswith(".txt"):
         loader = TextLoader(file_path=file_path, encoding="utf-8")
 
     doc_data = loader.load()
+    if metadata:
+        for doc in doc_data:
+            doc.metadata.update(metadata)
 
     splitter = RecursiveCharacterTextSplitter(
         separators=[
@@ -82,7 +89,6 @@ def insert_document_chroma(file_path: str):
     )
 
     docs = splitter.split_documents(doc_data)
-
     Chroma.from_documents(
         documents=docs,
         embedding=embeddings,
@@ -93,7 +99,6 @@ def insert_document_chroma(file_path: str):
 
 def delete_document_chroma(nombre_archivo: str):
     """Elimina un documento de ChromaDB basado en su nombre de archivo."""
-
     # Inicializar las incrustaciones y la conexión a ChromaDB
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-smalls", api_key=os.getenv("OPENAI_API_KEY"))
@@ -143,8 +148,13 @@ def list_documents_chroma():
     for meta in all_data['metadatas']:
         source = meta.get('source')
         num_pages = meta.get('page', 0)
+        title = meta.get('title', 'Sin título')
+        author = meta.get('author', 'No especificado')
+        date = meta.get('date', 'No especificado')
+        summary = meta.get('summary', 'No especificado')
         if source not in sources:
-            sources[source] = {"chunks": 0, "num_pages": num_pages}
+            sources[source] = {"chunks": 0, "num_pages": num_pages, "title": title,
+                               "author": author, "date": date, "summary": summary}
         sources[source]["chunks"] += 1
         if num_pages > sources[source]["num_pages"]:
             sources[source]["num_pages"] = num_pages
@@ -178,7 +188,47 @@ def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY, extension: str = ".t
     insert_document_chroma(STRUCTURE_FILE)
 
 
-@router.post("/upload-file/")
+def generate_metadata(doc):
+    """Genera metadatos para un documento."""
+    # V1
+    llm = ChatOpenAI(model="gpt-4o-mini",
+                     api_key=os.getenv("OPENAI_API_KEY"))
+    # prompt = PromptTemplate.from_template(
+    #     "Extrae los metadatos optimizado para vector search del siguiente documento sin decir
+    # nada más:\n\n{document}\n\nMetadatos:")
+    # chain = prompt | llm
+    # metadata = chain.invoke({
+    #     "document": doc
+    # })
+    # V2 - Genera para cada documento
+    schema = {
+        "properties": {
+            "title": {"type": "string"},
+            "author": {"type": "string"},
+            "date": {"type": "string"},
+            "summary": {"type": "string", "description": "Resumen breve del documento"},
+            "tags": {"type": "string"}
+        },
+        "required": ["title", "author", "date", "summary", "tags"]
+    }
+    parser = JsonOutputParser()
+    prompt = PromptTemplate(
+        template=(
+            "Extract the information as specified in \\{schema}.\n"
+            "{format_instructions}\n"
+            "{context}\n"
+        ),
+        input_variables=['context'],
+        partial_variables={
+            "format_instructions": parser.get_format_instructions()},
+    )
+    chain = prompt | llm | parser
+    metadata = chain.invoke({"context": doc, "schema": schema})
+    logger.info("Metadatos generados: %s", metadata)
+    return metadata
+
+
+@ router.post("/upload-file/")
 async def upload_file(file: UploadFile = File(...)):
     """Endpoint para subir un archivo PDF, JSON o TXT."""
     if not any(file.filename.endswith(ext) for ext in ALLOWED_EXTENSIONS):
@@ -192,16 +242,20 @@ async def upload_file(file: UploadFile = File(...)):
 
     try:
         save_file(file, RAG_DIR)  # Guardar el archivo en el directorio
-        insert_document_chroma(file_path)  # Insertar el documento en ChromaDB
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error al guardar el archivo: {str(e)}") from e
+    try:
+        insert_document_chroma(file_path)  # Insertar el documento en ChromaDB
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error al insertar el documento en ChromaDB: {str(e)}") from e
 
     return JSONResponse(content={"message": "Documento subido correctamente",
                                  "filename": file.filename})
 
 
-@router.get("/list-documents/")
+@ router.get("/list-documents/")
 async def list_documents():
     """Endpoint para listar los documentos en el directorio que alimenta al RAG."""
     exclude_extensions = [".gitkeep"]
@@ -212,9 +266,9 @@ async def list_documents():
     return JSONResponse(content={"documents": documents})
 
 
-@router.delete("/delete-document/")
+@ router.delete("/delete-document/")
 async def delete_pdf(filename: str):
-    """Endpoint para eliminar un documento del directorio que alimenta al RAG. 
+    """Endpoint para eliminar un documento del directorio que alimenta al RAG.
     También elimina el documento de ChromaDB."""
     file_path = os.path.join(RAG_DIR, filename)
 
@@ -233,7 +287,7 @@ async def delete_pdf(filename: str):
                                  "filename": filename})
 
 
-@router.get("/list-chroma-documents/")
+@ router.get("/list-chroma-documents/")
 async def list_chroma_documents():
     """Endpoint para listar los documentos en ChromaDB."""
     try:
@@ -245,7 +299,7 @@ async def list_chroma_documents():
     return JSONResponse(content={"documents": documents})
 
 
-@router.get("/structure/")
+@ router.get("/structure/")
 async def get_structure(extension: str = "txt"):
     """Endpoint para obtener la estructura de directorios y archivos para el RAG en TXT o JSON. """
     if extension not in ALLOWED_EXTENSIONS:
