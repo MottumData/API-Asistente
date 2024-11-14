@@ -7,7 +7,7 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import chat, rag_utils
+from .routers import chat, rag_utils, tender_agent
 
 
 # Configuración del logger
@@ -46,6 +46,7 @@ def ping():
 
 app.include_router(chat.router)
 app.include_router(rag_utils.router)
+app.include_router(tender_agent.router)
 
 
 if __name__ == "__main__":

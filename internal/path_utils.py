@@ -3,7 +3,7 @@ Este módulo define constantes para las rutas de directorios utilizadas en la ap
 """
 
 RAG_DIR = "rag_documents"
-
+TEMP_DIR = "temp"
 CHROMA_DB = "chroma_db"
 CHROMA_COLLECTION = "documents"
 STRUCTURE_DIRECTORY = '00_simulación_rag'
