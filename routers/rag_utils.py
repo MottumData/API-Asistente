@@ -258,7 +258,7 @@ async def upload_file(file: UploadFile = File(...)):
 @ router.get("/list-documents/")
 async def list_documents():
     """Endpoint para listar los documentos en el directorio que alimenta al RAG."""
-    exclude_extensions = [".gitkeep"]
+    exclude_extensions = [".gitkeep", ".txt", ".json"]
 
     documents = [f for f in os.listdir(RAG_DIR) if not any(
         f.endswith(ext) for ext in exclude_extensions)]
