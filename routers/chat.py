@@ -78,7 +78,7 @@ def get_prompt(prompt_name: str = None):
     return show_prompt(prompt_name=prompt_name) if prompt_name else show_prompt()
 
 
-@router.post("/chat/")
+@router.post("/chat/", deprecated=True)
 async def chat_history_endpoint(request: ChatRequest):
     """Endpoint para interactuar con un modelo de lenguaje como un chatbot."""
 
@@ -102,7 +102,7 @@ async def chat_history_endpoint(request: ChatRequest):
     return ChatResponse(response=response, conversation_id=conversation_id)
 
 
-@router.get("/chat_trace/")
+@router.get("/chat-trace/")
 def get_chat_trace(session_id: str, prettier: bool = False):
     """Función para obtener el historial de mensajes de una conversación."""
     if session_id not in conversations:
@@ -123,7 +123,7 @@ def get_chat_trace(session_id: str, prettier: bool = False):
     return conversations[session_id]
 
 
-@router.post("/chat_rag/")
+@router.post("/chat-rag/")
 async def chat_rag_endpoint(request: ChatRequest):
     """Pass"""
     conversation_id = request.conversation_id
