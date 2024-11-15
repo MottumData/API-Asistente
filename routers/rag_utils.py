@@ -302,9 +302,13 @@ async def list_chroma_documents():
 @ router.get("/structure/")
 async def get_structure(extension: str = "txt"):
     """Endpoint para obtener la estructura de directorios y archivos para el RAG en TXT o JSON. """
-    if extension not in ALLOWED_EXTENSIONS:
+    if extension not in ["json", "txt", ".json", ".txt"]:
         raise HTTPException(
-            status_code=400, detail="La extensión debe ser .txt o .json")
+            status_code=400, detail="La extensión debe ser txt o json")
+    if not os.path.exists(STRUCTURE_DIRECTORY):
+        raise HTTPException(
+            status_code=404, detail="No se encontró la estructura de directorios.")
+
     save_dir_structure(extension=extension)
     with open(STRUCTURE_FILE, 'r', encoding='utf-8') as f:
         structure = f.read()
