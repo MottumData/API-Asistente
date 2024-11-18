@@ -10,20 +10,21 @@ logger = logging.getLogger(__name__)
 
 def load_prompt(file_path: str = SYSTEM_PROMPT_PATH, prompt_name: str = None):
     """ Lee un prompt o esquema específico del sistema desde un archivo JSON."""
-    if prompt_name:
-        try:
-            with open(file_path, 'rb') as file:
-                prompts = json.loads(file.read())
-            logger.info("Prompt -> %s", prompt_name)
-            return prompts.get(prompt_name, None)
-        except FileNotFoundError:
-            logger.info("El archivo %s no se encontró.", file_path)
-            return None
-        except json.JSONDecodeError:
-            logger.info("Error al decodificar el archivo JSON %s.", file_path)
-            return None
-    else:
-        raise ValueError("El nombre del prompt es requerido.")
+    try:
+        with open(file_path, 'rb') as file:
+            prompts = json.loads(file.read())
+
+            if prompt_name:
+                logger.info("Prompt -> %s", prompt_name)
+                return prompts.get(prompt_name, None)
+            return prompts
+    except FileNotFoundError:
+        logger.info("El archivo %s no se encontró.", file_path)
+        return None
+    except json.JSONDecodeError:
+        logger.info(
+            "Error al decodificar el archivo JSON %s.", file_path)
+        return None
 
 
 def show_prompt(prompt_name: str = None):
