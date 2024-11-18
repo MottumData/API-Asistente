@@ -162,9 +162,9 @@ def list_documents_chroma():
     return sources
 
 
-def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY, extension: str = ".txt"):
+def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY, extension: str = "txt"):
     """Guarda la estructura de directorios en un archivo de texto o JSON."""
-    if extension == '.txt':
+    if extension == 'txt':
         with open(STRUCTURE_FILE, 'w', encoding='utf-8') as f:
             for dirpath, _, filenames in os.walk(root_dir):
                 if filenames:
@@ -173,7 +173,7 @@ def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY, extension: str = ".t
                         f.write(f"{file_path}\n")
                 else:
                     f.write(f"{dirpath}:\n")
-    elif extension == '.json':
+    elif extension == 'json':
         directory_structure = {}
         for dirpath, _, filenames in os.walk(root_dir):
             relative_path = os.path.relpath(dirpath, root_dir)
@@ -258,7 +258,7 @@ async def upload_file(file: UploadFile = File(...)):
 @ router.get("/list-documents/")
 async def list_documents():
     """Endpoint para listar los documentos en el directorio que alimenta al RAG."""
-    exclude_extensions = [".gitkeep", ".txt", ".json"]
+    exclude_extensions = [".gitkeep"]
 
     documents = [f for f in os.listdir(RAG_DIR) if not any(
         f.endswith(ext) for ext in exclude_extensions)]
