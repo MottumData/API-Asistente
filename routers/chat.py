@@ -147,7 +147,7 @@ async def chat_rag_endpoint(request: ChatRequest):
     history_aware_retriever = create_history_aware_retriever(
         llm, retriever, contextualize_q_prompt
     )
-
+    
     qa_system_prompt = load_prompt(prompt_name='qa_system_prompt')
 
     qa_prompt = ChatPromptTemplate.from_messages(

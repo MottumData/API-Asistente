@@ -17,6 +17,10 @@
                 "type": "string",
                 "description": "Requerimientos de características de la empresa"
             },
+            "fechas": {
+                "type": "string",
+                "description": "Fechas mas importantes, fechas de entregas, plazos."
+            },
             "duracion": {
                 "type": "string",
                 "description": "Duración del contrato o del proyecto"
