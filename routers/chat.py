@@ -14,7 +14,7 @@ from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMess
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_chroma import Chroma
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings, AzureChatOpenAI, AzureOpenAIEmbeddings
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -26,6 +26,37 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+conversations: Dict[str, BaseChatMessageHistory] = {}
+
+# llm = ChatOpenAI(
+#     model_name="gpt-4o-mini",
+#     openai_api_key=os.getenv("OPENAI_API_KEY"),
+#     temperature=0.2  # Ajusta según tus necesidades
+# )
+
+llm = AzureChatOpenAI(
+    azure_deployment='gpt-4o',
+    api_version="2024-08-01-preview",
+    azure_endpoint=os.getenv("AZURE_ENDPOINT"),
+    api_key=os.getenv("AZURE_API_KEY"),
+    temperature=0.2  # Ajusta según tus necesidades
+
+)
+
+# embeddings = OpenAIEmbeddings(
+#     model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
+
+embeddings = AzureOpenAIEmbeddings(
+    model="LLM-Codezca_text-embedding-3-large",
+    dimensions=None,
+    api_key=os.getenv("AZURE_API_KEY"),
+    azure_endpoint=os.getenv("AZURE_ENDPOINT"),
+    api_version="2023-05-15"
+)
+vector_store = Chroma(embedding_function=embeddings,
+                      persist_directory=CHROMA_DB,
+                      collection_name=CHROMA_COLLECTION)
 
 
 class Message(BaseModel):
@@ -46,22 +77,6 @@ class ChatResponse(BaseModel):
     conversation_id: str
     response: str
     retrieved_documents: List = None
-
-
-conversations: Dict[str, BaseChatMessageHistory] = {}
-
-llm = ChatOpenAI(
-    model_name="gpt-4o-mini",
-    openai_api_key=os.getenv("OPENAI_API_KEY"),
-    temperature=0.2  # Ajusta según tus necesidades
-)
-
-embeddings = OpenAIEmbeddings(
-    model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
-
-vector_store = Chroma(embedding_function=embeddings,
-                      persist_directory=CHROMA_DB,
-                      collection_name=CHROMA_COLLECTION)
 
 
 def get_session_history(session_id: str) -> BaseChatMessageHistory:
@@ -126,6 +141,7 @@ def get_chat_trace(session_id: str, prettier: bool = False):
 @router.post("/chat-rag/")
 async def chat_rag_endpoint(request: ChatRequest):
     """Pass"""
+    logger.info("Servicio de LLM usado: %s ", llm.get_name())
     conversation_id = request.conversation_id
     user_input = request.prompt
     config = {'configurable': {'session_id': conversation_id}}
@@ -147,7 +163,7 @@ async def chat_rag_endpoint(request: ChatRequest):
     history_aware_retriever = create_history_aware_retriever(
         llm, retriever, contextualize_q_prompt
     )
-    
+
     qa_system_prompt = load_prompt(prompt_name='qa_system_prompt')
 
     qa_prompt = ChatPromptTemplate.from_messages(
