@@ -1,15 +1,15 @@
 """ En este modulo se define la funcionalidad para el agente de licitaciones. """
 
 import os
+import asyncio
 import logging
-from io import BytesIO
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 
 
 from fastapi import APIRouter, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_community.document_loaders import PyPDFLoader
 
 from ..internal.path_utils import TEMP_DIR
@@ -53,8 +53,10 @@ def make_summary(doc, tender_data):
     summary = chain.invoke({"document": doc, "tender_data": tender_data})
     return summary
 
+# TODO - Modificar esta funcion
 
-@router.post("/upload_tdr/")
+
+@router.post("/upload-tdr/")
 async def upload_tdr(file: UploadFile = File(...)):
     """ Sube un documento y lo guarda temporalmente en el directorio temp. """
 
@@ -75,3 +77,38 @@ async def upload_tdr(file: UploadFile = File(...)):
     os.remove(temp_file_path)
 
     return JSONResponse({"key points": tender_data, "complete summary": summary.content})
+
+
+@router.post("/upload-tdr-streaming/")
+async def upload_tdr_streaming(file: UploadFile = File(...)):
+    """ Sube un documento y lo guarda temporalmente en el directorio temp. """
+
+    if not os.path.exists(TEMP_DIR):
+        os.makedirs(TEMP_DIR)
+    temp_file_path = os.path.join(TEMP_DIR, file.filename)
+
+    with open(temp_file_path, "wb") as temp_file:
+        contents = await file.read()
+        temp_file.write(contents)
+
+    loader = PyPDFLoader(temp_file_path)
+    document = loader.load()
+
+    async def generate():
+        tender_data = get_tender_data(document)
+        yield JSONResponse({"key points": tender_data}).body.decode()
+        await asyncio.sleep(1)
+
+        summary = make_summary(document, tender_data)
+        yield JSONResponse({"complete summary": summary.content}).body.decode()
+        await asyncio.sleep(1)
+
+        # Elimina el archivo temporal después de procesarlo
+        os.remove(temp_file_path)
+
+    return StreamingResponse(generate(), media_type="application/json")
+
+# TODO - Devolver referencias de los documentos mas alienados
+# TODO - Seleccionar las referencias pasadas.
+# TODO - Ofrecer una descripción de 2-3 párrafos sobre el objetivo del proyecto y aparte ofrecer highlights del enfoque o metodología que debe escoger.
+# TODO - Ofrecer un outline con la estructura de la propuesta donde el usuario puede escoger, modificar y reordenar.
