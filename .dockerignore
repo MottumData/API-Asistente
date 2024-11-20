@@ -142,6 +142,8 @@ dmypy.json
 #.git/
 #.gitignore
 # Mottum
-
+chroma_db/
+!rag_documents/.gitkeep
+rag_documents/*
 
 
