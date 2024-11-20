@@ -99,7 +99,6 @@ def insert_document_chroma(file_path: str):
         loader = CSVLoader(file_path=file_path)
 
     doc_data = loader.load()
-    logger.info("Documento cargado: %s", doc_data)
     if metadata:
         for doc in doc_data:
             doc.metadata.update(metadata)
