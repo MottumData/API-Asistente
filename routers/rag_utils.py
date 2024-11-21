@@ -49,7 +49,7 @@ llm = AzureChatOpenAI(
 
 
 embeddings = AzureOpenAIEmbeddings(
-    model="LLM-Codezca_text-embedding-3-large",
+    model="LLM-Codexca_text-embedding-3-large",
     dimensions=None,
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     azure_endpoint=os.getenv("AZURE_ENDPOINT"),
@@ -165,7 +165,7 @@ def list_documents_chroma():
         api_type="azure",
 
         api_base=os.getenv("AZURE_ENDPOINT"),
-        model_name="LLM-Codezca_text-embedding-3-large",
+        model_name="LLM-Codexca_text-embedding-3-large",
         api_version="2023-05-15",
 
     )

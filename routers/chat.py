@@ -48,7 +48,7 @@ llm = AzureChatOpenAI(
 #     model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
 
 embeddings = AzureOpenAIEmbeddings(
-    model="LLM-Codezca_text-embedding-3-large",
+    model="LLM-Codexca_text-embedding-3-large",
     dimensions=None,
     api_key=os.getenv("AZURE_API_KEY"),
     azure_endpoint=os.getenv("AZURE_ENDPOINT"),
