@@ -1,14 +1,37 @@
 services:
   api:
+    image: llmcodexca.azurecr.io/api-codexca:latest
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
       - LANGCHAIN_TRACING_V2=true
-      - LANGCHAIN_ENDPOINT="https://api.langchain.com"
-      - LANGCHAIN_PROJECT="VA-CODEXCA"
-    build:
-      context: .
+      - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
     ports:
       - "8000:8000"
-
     restart: on-failure
+    networks:
+      - codexca
+    volumes:
+       - chroma_db:/app/chroma_db
+       - rag_documents:/app/rag_documents
+
+  ui:
+    image: llmcodexca.azurecr.io/ui-codexca:latest
+    ports:
+      - "3000:3000"
+    restart: on-failure
+    networks:
+      - codexca
+
+networks:
+  codexca:
+    driver: bridge
+
+volumes:
+  chroma_db:
+    driver: local
+  rag_documents:
+    driver: local
