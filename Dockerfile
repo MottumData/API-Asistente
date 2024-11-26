@@ -3,7 +3,7 @@ LABEL authors="Arturo Ortiz"
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     software-properties-common \
     && apt-get clean \
