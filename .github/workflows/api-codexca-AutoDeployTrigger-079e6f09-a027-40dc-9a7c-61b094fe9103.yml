@@ -35,7 +35,7 @@ jobs:
         run: |
           IMAGE_TAG=llmcodexca.azurecr.io/api-codexca:${{ github.sha }}
           docker build -t $IMAGE_TAG .
-          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login llmcodexca.azurecr.io -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
+          echo "${{ secrets.APICODEXCA_REGISTRY_PASSWORD }}" | docker login llmcodexca.azurecr.io -u "${{ secrets.APICODEXCA_REGISTRY_PASSWORD }}" --password-stdin
           docker push $IMAGE_TAG
 
       - name: Deploy to Azure Container Apps
