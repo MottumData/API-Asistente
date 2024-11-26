@@ -1,4 +1,4 @@
-FROM python:3.11-bookworm
+FROM python:3.11-slim-bookworm
 LABEL authors="Arturo Ortiz"
 
 WORKDIR /app
@@ -6,19 +6,21 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     software-properties-common \
-    git \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.txt
 
-RUN pip install --upgrade pip
+# RUN pip install --upgrade pip
 
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
 
-EXPOSE 80
+EXPOSE 8000
 
-ENTRYPOINT ["fastapi", "run", "main.py", "--port", "80"]
+ENTRYPOINT ["fastapi", "run", "main.py", "--port", "8000"]

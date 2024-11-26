@@ -2,7 +2,7 @@ setuptools~=72.1.0
 pandas==2.2.2
 numpy==1.26.4
 python-dotenv==1.0.1
-langchain~=0.3.1
+langchain~=0.3.7
 langchain-community~=0.3.1
 langchain-openai~=0.2.1
 langchain-chroma~=0.1.4
@@ -11,3 +11,5 @@ pypdf==4.3.1
 fastapi~=0.115.0
 fastapi-cli~=0.0.5
 python-multipart~=0.0.17
+unstructured~=0.16.5
+xlrd==2.0.1	

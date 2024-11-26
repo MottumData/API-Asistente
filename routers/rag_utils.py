@@ -5,10 +5,16 @@ import json
 import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
-from langchain_community.document_loaders import PyPDFLoader, JSONLoader, TextLoader
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    JSONLoader,
+    TextLoader,
+    UnstructuredExcelLoader,
+    CSVLoader
+)
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 from langchain_chroma import Chroma
 import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
@@ -32,6 +38,25 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+llm = AzureChatOpenAI(
+    azure_deployment='gpt-4o',
+    api_version="2024-08-01-preview",
+    azure_endpoint=os.getenv("AZURE_ENDPOINT"),
+    api_key=os.getenv("AZURE_API_KEY"),
+    temperature=0.2  # Ajusta según tus necesidades
+
+)
+
+
+embeddings = AzureOpenAIEmbeddings(
+    model="LLM-Codexca_text-embedding-3-large",
+    dimensions=None,
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    azure_endpoint=os.getenv("AZURE_ENDPOINT"),
+    api_version="2023-05-15"
+)
+
+
 def save_file(file: UploadFile, directory: str) -> str:
     """Guarda el archivo en el directorio especificado."""
     file_path = os.path.join(directory, file.filename)
@@ -50,21 +75,28 @@ def delete_file(file_path: str) -> None:
 def insert_document_chroma(file_path: str):
     """Función para insertar un documento en la base de datos de Chroma."""
     # TODO - Generación de metadatos solo disponible para PDF por el momento.
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
 
     if not any(file_path.endswith(ext) for ext in ALLOWED_EXTENSIONS):
         raise ValueError(
-            "El archivo debe tener una de las siguientes extensiones: PDF, JSON o TXT")
+            "El archivo debe tener una de las siguientes extensiones: %s" % ALLOWED_EXTENSIONS)
     loader = None
     metadata = None
     if file_path.endswith(".json"):
+        logger.info("Cargando archivo JSON: %s", file_path)
         loader = JSONLoader(file_path=file_path, jq_schema=".[] | .[]")
     elif file_path.endswith(".pdf"):
+        logger.info("Cargando archivo PDF: %s", file_path)
         loader = PyPDFLoader(file_path=file_path)
         metadata = generate_metadata(loader.load())
     elif file_path.endswith(".txt"):
+        logger.info("Cargando archivo de texto: %s", file_path)
         loader = TextLoader(file_path=file_path, encoding="utf-8")
+    elif file_path.endswith(".xls") or file_path.endswith(".xlsx"):
+        logger.info("Cargando archivo Excel: %s", file_path)
+        loader = UnstructuredExcelLoader(file_path=file_path)
+    elif file_path.endswith(".csv"):
+        logger.info("Cargando archivo CSV: %s", file_path)
+        loader = CSVLoader(file_path=file_path)
 
     doc_data = loader.load()
     if metadata:
@@ -99,9 +131,6 @@ def insert_document_chroma(file_path: str):
 
 def delete_document_chroma(nombre_archivo: str):
     """Elimina un documento de ChromaDB basado en su nombre de archivo."""
-    # Inicializar las incrustaciones y la conexión a ChromaDB
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-smalls", api_key=os.getenv("OPENAI_API_KEY"))
     vectores = Chroma(
         embedding_function=embeddings,
         persist_directory=CHROMA_DB,
@@ -132,8 +161,13 @@ def delete_document_chroma(nombre_archivo: str):
 def list_documents_chroma():
     """Función para listar los documentos en la base de datos de Chroma."""
     embedding = OpenAIEmbeddingFunction(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model_name="text-embedding-3-small"
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_type="azure",
+
+        api_base=os.getenv("AZURE_ENDPOINT"),
+        model_name="LLM-Codexca_text-embedding-3-large",
+        api_version="2023-05-15",
+
     )
     client = chromadb.PersistentClient(CHROMA_DB)
 
@@ -191,8 +225,8 @@ def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY, extension: str = "tx
 def generate_metadata(doc):
     """Genera metadatos para un documento."""
     # V1
-    llm = ChatOpenAI(model="gpt-4o-mini",
-                     api_key=os.getenv("OPENAI_API_KEY"))
+    # llm = ChatOpenAI(model="gpt-4o-mini",
+    #                  api_key=os.getenv("OPENAI_API_KEY"))
     # prompt = PromptTemplate.from_template(
     #     "Extrae los metadatos optimizado para vector search del siguiente documento sin decir
     # nada más:\n\n{document}\n\nMetadatos:")
@@ -230,10 +264,10 @@ def generate_metadata(doc):
 
 @ router.post("/upload-file/")
 async def upload_file(file: UploadFile = File(...)):
-    """Endpoint para subir un archivo PDF, JSON o TXT."""
+    """Endpoint para subir un archivo  PDF, JSON, TXT, CSV o XLS."""
     if not any(file.filename.endswith(ext) for ext in ALLOWED_EXTENSIONS):
         raise HTTPException(
-            status_code=400, detail="Únicamente se pueden adjuntar archivos PDF, JSON o TXT")
+            status_code=400, detail="Sólo se pueden adjuntar archivos: PDF, JSON, TXT, CSV o XLS")
 
     file_path = os.path.join(RAG_DIR, file.filename)
     if os.path.exists(file_path):
@@ -243,6 +277,9 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         save_file(file, RAG_DIR)  # Guardar el archivo en el directorio
     except Exception as e:
+        delete_file(file_path)
+        logger.info(
+            "Eliminado archivo al no poder guardarlo en Chroma: %s", file)
         raise HTTPException(
             status_code=500, detail=f"Error al guardar el archivo: {str(e)}") from e
     try:

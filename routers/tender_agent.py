@@ -3,9 +3,10 @@
 import os
 import asyncio
 import logging
-from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
+from langchain_openai import AzureChatOpenAI
+
 
 
 from fastapi import APIRouter, UploadFile, File
@@ -19,7 +20,14 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 
-llm = ChatOpenAI(model="gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+llm = AzureChatOpenAI(
+    azure_deployment='gpt-4o',
+    api_version="2024-08-01-preview",
+    azure_endpoint=os.getenv("AZURE_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    temperature=0.2  # Ajusta según tus necesidades
+
+)
 
 # TODO - Diseñar el resto de elementos
 
