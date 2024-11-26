@@ -31,12 +31,16 @@ jobs:
           tenant-id: ${{ secrets.APICODEXCA_AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.APICODEXCA_AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and Push Docker Image to Azure Container Registry
-        run: |
-          IMAGE_TAG=llmcodexca.azurecr.io/api-codexca:${{ github.sha }}
-          docker build -t $IMAGE_TAG .
-          echo "${{ secrets.APICODEXCA_REGISTRY_PASSWORD }}" | docker login llmcodexca.azurecr.io -u "${{ secrets.APICODEXCA_REGISTRY_PASSWORD }}" --password-stdin
-          docker push $IMAGE_TAG
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}
+          _dockerfilePathKey_: _dockerfilePath_
+          registryUrl: llmcodexca.azurecr.io
+          registryUsername: ${{ secrets.APICODEXCA_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.APICODEXCA_REGISTRY_PASSWORD }}
+          containerAppName: api-codexca
+          resourceGroup: LLM-Codexca
 
       - name: Deploy to Azure Container Apps
         run: |
