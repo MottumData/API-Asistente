@@ -1,6 +1,6 @@
 """Este script configura y ejecuta una aplicación FastAPI con carga de variables de entorno. 
    Punto de entrada de la aplicación."""
-
+import os
 import logging
 from datetime import datetime
 import uvicorn
@@ -20,9 +20,9 @@ load_dotenv()
 app = FastAPI(title="API de Asistente de IA de Codexca", version="0.0.1")
 
 origins = [
-    "http://localhost:80",
     "http://localhost:8000",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    os.getenv("UI_BASE_URL"),
 ]
 
 app.add_middleware(
