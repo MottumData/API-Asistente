@@ -41,7 +41,7 @@ jobs:
           registryPassword: ${{ secrets.APICODEXCA_REGISTRY_PASSWORD }}
           containerAppName: api-codexca
           resourceGroup: LLM-Codexca
-          imageToBuild: llmcodexca.azurecr.io/api-codexca:${{ github.sha }}
+          imageToBuild: llmcodexca.azurecr.io/api-codexca:latest
 
 
       - name: Deploy to Azure Container Apps
@@ -49,6 +49,6 @@ jobs:
           az containerapp update \
             --name api-codexca \
             --resource-group LLM-Codexca \
-            --image llmcodexca.azurecr.io/api-codexca:${{ github.sha }}
+            --image llmcodexca.azurecr.io/api-codexca:latest
 
 
