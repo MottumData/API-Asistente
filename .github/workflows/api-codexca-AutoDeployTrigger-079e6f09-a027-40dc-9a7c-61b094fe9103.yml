@@ -51,5 +51,13 @@ jobs:
             --name api-codexca \
             --resource-group LLM-Codexca \
             --image llmcodexca.azurecr.io/api-codexca:latest
+            --set-env-vars \
+              AZURECR_PASSWORD=${{ secrets.AZURECR_PASSWORD }} \
+              AZURE_OPENAI_API_KEY=${{ secrets.AZURE_OPENAI_API_KEY }} \
+              AZURE_OPENAI_ENDPOINT=${{ secrets.AZURE_OPENAI_ENDPOINT }} \
+              LANGCHAIN_API_KEY=${{ secrets.LANGCHAIN_API_KEY }} \
+              LANGCHAIN_PROJECT=${{ secrets.LANGCHAIN_PROJECT }} \
+              LANGCHAIN_TRACING_V2=${{ secrets.LANGCHAIN_TRACING_V2 }} \
+              UI_BASE_URL=${{ secrets.UI_BASE_URL }}
 
 
