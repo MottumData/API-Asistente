@@ -29,12 +29,6 @@ router = APIRouter()
 
 conversations: Dict[str, BaseChatMessageHistory] = {}
 
-# llm = ChatOpenAI(
-#     model_name="gpt-4o-mini",
-#     openai_api_key=os.getenv("OPENAI_API_KEY"),
-#     temperature=0.2  # Ajusta según tus necesidades
-# )
-
 llm = AzureChatOpenAI(
     azure_deployment='gpt-4o',
     api_version="2024-08-01-preview",
@@ -43,9 +37,6 @@ llm = AzureChatOpenAI(
     temperature=0.2  # Ajusta según tus necesidades
 
 )
-
-# embeddings = OpenAIEmbeddings(
-#     model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
 
 embeddings = AzureOpenAIEmbeddings(
     model="LLM-Codexca_text-embedding-3-large",
