@@ -3,6 +3,7 @@
 import os
 import json
 import logging
+import time
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from langchain_community.document_loaders import (
@@ -87,7 +88,7 @@ def insert_document_chroma(file_path: str):
     elif file_path.endswith(".pdf"):
         logger.info("Cargando archivo PDF: %s", file_path)
         loader = PyPDFLoader(file_path=file_path)
-        metadata = generate_metadata(loader.load())
+        # metadata = generate_metadata(loader.load())
     elif file_path.endswith(".txt"):
         logger.info("Cargando archivo de texto: %s", file_path)
         loader = TextLoader(file_path=file_path, encoding="utf-8")
@@ -102,6 +103,9 @@ def insert_document_chroma(file_path: str):
     if metadata:
         for doc in doc_data:
             doc.metadata.update(metadata)
+    if not doc_data:
+        logger.error("No se cargó contenido del archivo: %s", file_path)
+        return None
 
     splitter = RecursiveCharacterTextSplitter(
         separators=[
@@ -196,28 +200,41 @@ def list_documents_chroma():
     return sources
 
 
-def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY, extension: str = "txt"):
-    """Guarda la estructura de directorios en un archivo de texto o JSON."""
+def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY,
+                       extension: str = "txt",
+                       bulk_insert: bool = False):
+    """Guarda la estructura de directorios en un archivo de texto o JSON, 
+    y almacena los archivos permitidos en chroma_db."""
     if extension == 'txt':
         with open(STRUCTURE_FILE, 'w', encoding='utf-8') as f:
             for dirpath, _, filenames in os.walk(root_dir):
-                if filenames:
-                    for filename in filenames:
+                for filename in filenames:
+                    if filename.split('.')[-1] in ALLOWED_EXTENSIONS:
                         file_path = os.path.join(dirpath, filename)
                         f.write(f"{file_path}\n")
-                else:
+                        # Almacenar el archivo en chroma_db
+                        if bulk_insert:
+                            insert_document_chroma(file_path)
+                            time.sleep(0.5)
+                if not filenames:
                     f.write(f"{dirpath}:\n")
     elif extension == 'json':
         directory_structure = {}
         for dirpath, _, filenames in os.walk(root_dir):
             relative_path = os.path.relpath(dirpath, root_dir)
-            if filenames:
-                directory_structure[relative_path] = filenames
-            else:
-                directory_structure[relative_path] = []
+            allowed_files = [filename for filename in filenames if filename.split(
+                '.')[-1] in ALLOWED_EXTENSIONS]
+            directory_structure[relative_path] = allowed_files
+
+            for filename in allowed_files:
+                file_path = os.path.join(dirpath, filename)
+                # Almacenar el archivo en chroma_db
+                if bulk_insert:
+                    insert_document_chroma(file_path)
 
         with open(STRUCTURE_FILE, 'w', encoding='utf-8') as f:
             json.dump(directory_structure, f, ensure_ascii=False, indent=4)
+
     logger.info("Estructura de directorios guardada en %s", STRUCTURE_FILE)
     insert_document_chroma(STRUCTURE_FILE)
 
@@ -336,8 +353,8 @@ async def list_chroma_documents():
     return JSONResponse(content={"documents": documents})
 
 
-@ router.get("/structure/")
-async def get_structure(extension: str = "txt"):
+@ router.get("/save-structure/")
+async def save_directory_structure(extension: str = "txt", bulk_insert: bool = False):
     """Endpoint para obtener la estructura de directorios y archivos para el RAG en TXT o JSON. """
     if extension not in ["json", "txt", ".json", ".txt"]:
         raise HTTPException(
@@ -346,7 +363,7 @@ async def get_structure(extension: str = "txt"):
         raise HTTPException(
             status_code=404, detail="No se encontró la estructura de directorios.")
 
-    save_dir_structure(extension=extension)
+    save_dir_structure(extension=extension, bulk_insert=bulk_insert)
     with open(STRUCTURE_FILE, 'r', encoding='utf-8') as f:
         structure = f.read()
     return JSONResponse(content={"structure": structure})
