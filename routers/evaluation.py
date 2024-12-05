@@ -21,7 +21,7 @@ def gold_standard_evaluation(url="localhost:8000"):
     try:
         with open(GOLD_STANDARD_PATH, "rb") as json_file:
             data = [json.loads(line) for line in json_file]
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
         raise HTTPException(
             status_code=404, detail="El archivo gold standard no se encontró.") from exc
     except json.JSONDecodeError as exc:
