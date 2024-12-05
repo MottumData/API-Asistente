@@ -361,7 +361,7 @@ async def save_directory_structure(extension: str = "txt", bulk_insert: bool = F
             status_code=400, detail="La extensión debe ser txt o json")
     if not os.path.exists(STRUCTURE_DIRECTORY):
         raise HTTPException(
-            status_code=404, detail="No se encontró la estructura de directorios.")
+            status_code=404, detail="No se encontró la estructura de directorios. Contacta al administrador.")
 
     save_dir_structure(extension=extension, bulk_insert=bulk_insert)
     with open(STRUCTURE_FILE, 'r', encoding='utf-8') as f:
