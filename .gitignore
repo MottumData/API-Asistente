@@ -314,3 +314,4 @@ rag_documents/*
 chroma_db/*
 chroma_db/
 00_simulación_rag/*
+gold_standard_*.jsonl

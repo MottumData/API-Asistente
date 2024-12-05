@@ -148,5 +148,6 @@ dmypy.json
 !rag_documents/.gitkeep
 rag_documents/*
 00_simulacion_rag/*
+gold_standard_*.jsonl
 
 
