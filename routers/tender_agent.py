@@ -5,16 +5,17 @@ import asyncio
 import logging
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain_openai import AzureChatOpenAI
-
-
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
+from pydantic import BaseModel
 
 from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_chroma import Chroma
 
-from ..internal.path_utils import TEMP_DIR
+from ..internal.path_utils import TEMP_DIR, CHROMA_DB, CHROMA_COLLECTION
 from ..internal.prompt_utils import load_prompt
+
 
 router = APIRouter()
 
@@ -29,7 +30,21 @@ llm = AzureChatOpenAI(
 
 )
 
+embeddings = AzureOpenAIEmbeddings(
+    model="LLM-Codexca_text-embedding-3-large",
+    dimensions=None,
+    api_key=os.getenv("AZURE_API_KEY"),
+    azure_endpoint=os.getenv("AZURE_ENDPOINT"),
+    api_version="2023-05-15"
+)
+
 # TODO - Diseñar el resto de elementos
+
+
+class RelevantDocumentRequest(BaseModel):
+    """Modelo para la solicitud de documentos relevantes."""
+    query: str
+    num_proposals: int = 5
 
 
 def get_tender_data(doc):
@@ -65,7 +80,7 @@ def make_summary(doc, tender_data):
 
 
 @router.post("/upload-tdr/")
-async def upload_tdr(file: UploadFile = File(...)):
+async def upload_tdr(file: UploadFile = File(...), num_proposals: int = 5):
     """ Sube un documento y lo guarda temporalmente en el directorio temp. """
 
     if not os.path.exists(TEMP_DIR):
@@ -78,13 +93,34 @@ async def upload_tdr(file: UploadFile = File(...)):
 
     loader = PyPDFLoader(temp_file_path)
     document = loader.load()
+
     tender_data = get_tender_data(document)
     summary = make_summary(document, tender_data)
+    related_project = make_project_proposal(
+        RelevantDocumentRequest(query=summary.content, num_proposals=num_proposals), from_endpoint=False)
 
-    # Elimina el archivo temporal después de procesarlo
     os.remove(temp_file_path)
 
-    return JSONResponse({"key points": tender_data, "complete summary": summary.content})
+    return JSONResponse({"key points": tender_data, "complete summary": summary.content, "related projects": related_project})
+
+
+@router.post('/related-projects/')
+def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool = True):
+    """ Obtiene X propuestas de proyecto a partir de los términos de referencia y la información extraída. """
+    # Conectar a la base de datos de ChromaDB
+    query = request.query
+    num_proposals = request.num_proposals
+    vector_store = Chroma(embedding_function=embeddings,
+                          persist_directory=CHROMA_DB,
+                          collection_name=CHROMA_COLLECTION)
+
+    retriever = vector_store.as_retriever(
+        search_type='mmr', search_kwargs={'k': num_proposals})
+
+    related_docs = retriever.invoke(query)
+    related_docs = [{str(doc.metadata['source']).split(sep='\\')[-1]: doc.page_content}
+                    for doc in related_docs]
+    return JSONResponse({"related_projects": related_docs, "query": query}) if from_endpoint else related_docs
 
 
 @router.post("/upload-tdr-streaming/")
