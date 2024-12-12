@@ -219,7 +219,7 @@ def load_document_chroma(source: str):
     all_data = col.get(
         include=["documents", "metadatas"],
     )
-    logger.info("Documentos en ChromaDB: %s", len(all_data['documents']))
+    # logger.info("Documentos en ChromaDB: %s", len(all_data['documents']))
 
     document_chunks = []
     for doc, metadata in zip(all_data['documents'], all_data['metadatas']):
