@@ -200,6 +200,38 @@ def list_documents_chroma():
     return sources
 
 
+def load_document_chroma(source: str):
+    """Función para cargar un documento de ChromaDB basado en su nombre de archivo."""
+    embedding = OpenAIEmbeddingFunction(
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_type="azure",
+
+        api_base=os.getenv("AZURE_ENDPOINT"),
+        model_name="LLM-Codexca_text-embedding-3-large",
+        api_version="2023-05-15",
+
+    )
+    client = chromadb.PersistentClient(CHROMA_DB)
+
+    col = client.get_collection(
+        name=CHROMA_COLLECTION, embedding_function=embedding)
+
+    all_data = col.get(
+        include=["documents", "metadatas"],
+    )
+    logger.info("Documentos en ChromaDB: %s", len(all_data['documents']))
+
+    document_chunks = []
+    for doc, metadata in zip(all_data['documents'], all_data['metadatas']):
+        if source in metadata.get('source'):
+            document_chunks.append(doc)
+
+    if document_chunks:
+        return document_chunks
+
+    return None
+
+
 def save_dir_structure(root_dir: str = STRUCTURE_DIRECTORY,
                        extension: str = "txt",
                        bulk_insert: bool = False):
@@ -351,6 +383,18 @@ async def list_chroma_documents():
             status_code=500, detail=f"Error al listar los documentos: {str(e)}") from e
 
     return JSONResponse(content={"documents": documents})
+
+
+@router.get("/load-chroma-document/")
+async def load_chroma_document(source: str):
+    """Endpoint para cargar un documento de ChromaDB."""
+    try:
+        document = load_document_chroma(source)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error al cargar el documento: {str(e)}") from e
+
+    return JSONResponse(content={"document": document})
 
 
 @ router.get("/save-structure/")
