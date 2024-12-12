@@ -7,6 +7,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from pydantic import BaseModel
+from typing import List, Dict
 
 from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -15,7 +16,7 @@ from langchain_chroma import Chroma
 
 from ..internal.path_utils import TEMP_DIR, CHROMA_DB, CHROMA_COLLECTION
 from ..internal.prompt_utils import load_prompt
-
+from .rag_utils import load_document_chroma
 
 router = APIRouter()
 
@@ -38,13 +39,81 @@ embeddings = AzureOpenAIEmbeddings(
     api_version="2023-05-15"
 )
 
-# TODO - Diseñar el resto de elementos
-
 
 class RelevantDocumentRequest(BaseModel):
     """Modelo para la solicitud de documentos relevantes."""
     query: str
     num_proposals: int = 5
+
+
+class ConceptNotesRequest(BaseModel):
+    """Modelo para la solicitud de concept notes."""
+    proposal_id: str
+    tdr_summary: str
+    information_sources: List[str]
+
+
+class TenderProposal(BaseModel):
+    """Modelo para las propuestas de proyecto."""
+    proposal_id: str
+    tdr_summary: str = None
+    title: str = None
+    information_sources: List[str] = None
+    concept_notes: str = None
+    index: List[str] = None
+    key_ideas: str = None
+    content: Dict[str, str] = None
+
+    def get_proposal_id(self):
+        return self.proposal_id
+
+    def set_proposal_id(self, proposal_id: str):
+        self.proposal_id = proposal_id
+
+    def get_tdr_summary(self):
+        return self.tdr_summary
+
+    def set_tdr_summary(self, tdr_summary: str):
+        self.tdr_summary = tdr_summary
+
+    def get_title(self):
+        return self.title
+
+    def set_title(self, title: str):
+        self.title = title
+
+    def get_information_sources(self):
+        return self.information_sources
+
+    def set_information_sources(self, information_sources: List[str]):
+        self.information_sources = information_sources
+
+    def get_concept_notes(self):
+        return self.concept_notes
+
+    def set_concept_notes(self, concept_notes: str):
+        self.concept_notes = concept_notes
+
+    def get_index(self):
+        return self.index
+
+    def set_index(self, index: List[str]):
+        self.index = index
+
+    def get_key_ideas(self):
+        return self.key_ideas
+
+    def set_key_ideas(self, key_ideas: str):
+        self.key_ideas = key_ideas
+
+    def get_content(self):
+        return self.content
+
+    def set_content(self, content: Dict[str, str]):
+        self.content = content
+
+
+proposals: Dict[str, TenderProposal] = {}
 
 
 def get_tender_data(doc):
@@ -76,8 +145,6 @@ def make_summary(doc, tender_data):
     summary = chain.invoke({"document": doc, "tender_data": tender_data})
     return summary
 
-# TODO - Modificar esta funcion
-
 
 @router.post("/upload-tdr/")
 async def upload_tdr(file: UploadFile = File(...), num_proposals: int = 5):
@@ -97,17 +164,23 @@ async def upload_tdr(file: UploadFile = File(...), num_proposals: int = 5):
     tender_data = get_tender_data(document)
     summary = make_summary(document, tender_data)
     related_project = make_project_proposal(
-        RelevantDocumentRequest(query=summary.content, num_proposals=num_proposals), from_endpoint=False)
+        RelevantDocumentRequest(query=summary.content,
+                                num_proposals=num_proposals),
+        from_endpoint=False)
 
     os.remove(temp_file_path)
 
-    return JSONResponse({"key points": tender_data, "complete summary": summary.content, "related projects": related_project})
+    return JSONResponse({"key points": tender_data, "complete summary": summary.content,
+                         "related projects": related_project})
+
+# TODO - Que se devuelvan los proyectos unicos.
 
 
 @router.post('/related-projects/')
-def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool = True):
-    """ Obtiene X propuestas de proyecto a partir de los términos de referencia y la información extraída. """
-    # Conectar a la base de datos de ChromaDB
+def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool = False):
+    """ Obtiene X propuestas de proyecto a partir de los términos de referencia 
+        y la información extraída. """
+
     query = request.query
     num_proposals = request.num_proposals
     vector_store = Chroma(embedding_function=embeddings,
@@ -120,7 +193,38 @@ def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool 
     related_docs = retriever.invoke(query)
     related_docs = [{str(doc.metadata['source']).split(sep='\\')[-1]: doc.page_content}
                     for doc in related_docs]
-    return JSONResponse({"related_projects": related_docs, "query": query}) if from_endpoint else related_docs
+    if from_endpoint:
+        return JSONResponse({"related_projects": related_docs, "query": query})
+    return related_docs
+
+
+@router.post('/make-concept-notes/')
+def make_concept_notes(request: ConceptNotesRequest):
+    """ Genera las notas conceptuales de un proyecto. """
+
+    proposal_id = request.proposal_id
+    information_sources = request.information_sources
+    tdr_summary = request.tdr_summary
+    # proposal = proposals[proposal_id]
+    proposals[proposal_id] = TenderProposal(proposal_id=proposal_id)
+    proposal = proposals[proposal_id]
+    proposal.set_information_sources(information_sources)
+    proposal.set_tdr_summary(tdr_summary)
+    logger.info('Generating concept notes for proposal: %s. Information sources: %s',
+                proposal_id, str(information_sources))
+
+    information_source_docs = [load_document_chroma(source)
+                               for source in information_sources]
+
+    json_template = load_prompt(prompt_name="make_concept_notes")
+    concept_notes_prompt = PromptTemplate(
+        template=(json_template),
+        input_variables=['tdr_summary', 'information_sources'],
+    )
+    chain = concept_notes_prompt | llm
+    response = chain.invoke(
+        {"tdr_summary": tdr_summary, "information_sources": information_source_docs})
+    return JSONResponse({"concept_notes": response.content})
 
 
 @router.post("/upload-tdr-streaming/")
