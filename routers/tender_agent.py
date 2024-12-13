@@ -3,13 +3,14 @@
 import os
 import asyncio
 import logging
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import PromptTemplate
-from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from pydantic import BaseModel
 from typing import List, Dict
 
-from fastapi import APIRouter, UploadFile, File
+from langchain_core.output_parsers import JsonOutputParser, CommaSeparatedListOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
+from openai import RateLimitError
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
@@ -53,13 +54,19 @@ class ConceptNotesRequest(BaseModel):
     information_sources: List[str]
 
 
+class SaveConceptNotesRequest(BaseModel):
+    """Modelo para la solicitud de concept notes."""
+    proposal_id: str
+    concept_notes: Dict
+
+
 class TenderProposal(BaseModel):
     """Modelo para las propuestas de proyecto."""
     proposal_id: str
     tdr_summary: str = None
     title: str = None
     information_sources: List[str] = None
-    concept_notes: str = None
+    concept_notes: Dict[str, str] = None
     index: List[str] = None
     key_ideas: str = None
     content: Dict[str, str] = None
@@ -197,6 +204,9 @@ def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool 
         return JSONResponse({"related_projects": related_docs, "query": query})
     return related_docs
 
+# TODO - Rediseñar la forma en que se cargan los documentos de información.
+# TODO - Modificar la respuesta para que se devuelva un JSON con los documentos y sus fuentes.
+
 
 @router.post('/make-concept-notes/')
 def make_concept_notes(request: ConceptNotesRequest):
@@ -205,26 +215,90 @@ def make_concept_notes(request: ConceptNotesRequest):
     proposal_id = request.proposal_id
     information_sources = request.information_sources
     tdr_summary = request.tdr_summary
-    # proposal = proposals[proposal_id]
-    proposals[proposal_id] = TenderProposal(proposal_id=proposal_id)
+
+    logger.info('Creating proposal with ID: %s', proposal_id)
+    proposals[proposal_id] = TenderProposal(
+        proposal_id=proposal_id)  # Crea una nueva propuesta
     proposal = proposals[proposal_id]
     proposal.set_information_sources(information_sources)
     proposal.set_tdr_summary(tdr_summary)
     logger.info('Generating concept notes for proposal: %s. Information sources: %s',
                 proposal_id, str(information_sources))
-
     information_source_docs = [load_document_chroma(source)
                                for source in information_sources]
 
     json_template = load_prompt(prompt_name="make_concept_notes")
+    json_parser = JsonOutputParser()
     concept_notes_prompt = PromptTemplate(
         template=(json_template),
         input_variables=['tdr_summary', 'information_sources'],
+        partial_variables={
+            "format_instructions": json_parser.get_format_instructions(),
+        }
     )
-    chain = concept_notes_prompt | llm
+    chain = concept_notes_prompt | llm | json_parser
+    try:
+        response = chain.invoke(
+            {"tdr_summary": tdr_summary, "information_sources": information_source_docs})
+    except RateLimitError as e:
+        raise HTTPException(
+            status_code=429,
+            detail="Documento demasiado extenso para el modelo. Pruebe con un documento más corto.") from e
+    return JSONResponse({"concept_notes": response})
+
+
+@router.post('/save-concepts-notes/')
+def save_concept_notes(request: SaveConceptNotesRequest):
+    """ Guarda las notas conceptuales de un proyecto a partir de su ID. """
+
+    proposal_id = request.proposal_id
+    concept_notes = request.concept_notes
+    proposals[proposal_id].set_concept_notes(concept_notes)
+    return JSONResponse(status_code=200, content={"message": "Notas conceptuales guardadas con éxito."})
+
+
+@router.get('/make-index/')
+def make_index(proposal_id):
+    """ Genera un índice de un proyecto. """
+    proposal = proposals[proposal_id]
+    concept_notes = proposal.get_concept_notes()
+    tdr_summary = proposal.get_tdr_summary()
+
+    json_template = load_prompt(prompt_name="make_index")
+    json_parser = JsonOutputParser()
+
+    index_prompt = PromptTemplate(
+        template=(json_template),
+        input_variables=['tdr_summary', 'concept_notes'],
+        partial_variables={
+            "format_instructions": json_parser.get_format_instructions(),
+        }
+    )
+
+    chain = index_prompt | llm | json_parser
     response = chain.invoke(
-        {"tdr_summary": tdr_summary, "information_sources": information_source_docs})
-    return JSONResponse({"concept_notes": response.content})
+        {"tdr_summary": tdr_summary, "concept_notes": concept_notes})
+    return response
+
+
+@router.post('/save-index/')
+def save_index(proposal_id: str, index: List[str]):
+    """ Guarda el índice de un proyecto a partir de su ID. """
+    proposals[proposal_id].set_index(index)
+    return JSONResponse(status_code=200, content={"message": "Índice guardado con éxito."})
+
+
+@router.get('/proposal-trace/')
+def get_proposal_trace(proposal_id: str):
+    """ Obtiene el registro de una propuesta a partir de su ID."""
+    
+    raise HTTPException(status_code=503, detail="Este endpoint está en desarrollo. Por favor, inténtelo más tarde.")
+
+    # try:
+    #     proposal = proposals[proposal_id]
+    # except KeyError:
+    #     return JSONResponse(status_code=404, content={"message": "Código de propuesta no encontrado."})
+    # return JSONResponse(proposal.model_dump(mode='json'))
 
 
 @router.post("/upload-tdr-streaming/")
@@ -256,7 +330,4 @@ async def upload_tdr_streaming(file: UploadFile = File(...)):
 
     return StreamingResponse(generate(), media_type="application/json")
 
-# TODO - Devolver referencias de los documentos mas alienados
-# TODO - Seleccionar las referencias pasadas.
-# TODO - Ofrecer una descripción de 2-3 párrafos sobre el objetivo del proyecto y aparte ofrecer highlights del enfoque o metodología que debe escoger.
 # TODO - Ofrecer un outline con la estructura de la propuesta donde el usuario puede escoger, modificar y reordenar.
