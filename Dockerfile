@@ -23,4 +23,4 @@ COPY . /app
 
 EXPOSE 8000
 
-ENTRYPOINT ["fastapi", "run", "--workers","4","main.py", "--port", "8000"]
+ENTRYPOINT ["fastapi", "run","main.py", "--port", "8000"]
