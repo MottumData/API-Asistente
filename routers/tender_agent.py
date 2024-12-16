@@ -71,6 +71,15 @@ class SaveIndexRequest(BaseModel):
     index: Dict
 
 
+class ContentRequest(BaseModel):
+    """Modelo para la solicitud de generación de contenido de la propuesta"""
+    proposal_id: str
+
+class SaveContentRequest(BaseModel):
+    """Modelo para la solicitud de guardado del contenido de la propuesta"""
+    proposal_id: str
+    content: Dict
+
 class TenderProposal(BaseModel):
     """Modelo para las propuestas de proyecto."""
     proposal_id: str
@@ -78,7 +87,7 @@ class TenderProposal(BaseModel):
     title: str = None
     information_sources: List[str] = None
     concept_notes: Dict[str, str] = None
-    index: List[str] = None
+    index: Dict = None
     key_ideas: str = None
     content: Dict[str, str] = None
 
@@ -219,7 +228,7 @@ def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool 
 # TODO - Modificar la respuesta para que se devuelva un JSON con los documentos y sus fuentes.
 
 
-@router.post('/make-concept-notes/')
+@router.post('/make-concept-note/')
 def make_concept_notes(request: ConceptNotesRequest):
     """ Genera las notas conceptuales de un proyecto. """
 
@@ -238,7 +247,7 @@ def make_concept_notes(request: ConceptNotesRequest):
     information_source_docs = [load_document_chroma(source)
                                for source in information_sources]
 
-    json_template = load_prompt(prompt_name="make_concept_notes")
+    json_template = load_prompt(prompt_name="make_concept_note")
     json_parser = JsonOutputParser()
     concept_notes_prompt = PromptTemplate(
         template=(json_template),
@@ -300,6 +309,17 @@ def save_index(request: SaveIndexRequest):
     index = request.index
     proposals[proposal_id].set_index(index)
     return JSONResponse(status_code=200, content={"message": "Índice guardado con éxito."})
+
+@router.post('/make-content/')
+def make_proposal_content(request: ContentRequest):
+
+    proposal = proposals[str(request.proposal_id)]
+    concept_notes = proposal.get_concept_notes()
+    tdr_summary = proposal.get_tdr_summary()
+    index = proposal.get_index()
+    bussiness_information = load_document_chroma('CODEXCA - DOSSIER DIGITAL 2021.pdf')
+
+    json_template = load_prompt(prompt_name="make_content")
 
 
 @router.get('/proposal-trace/')
