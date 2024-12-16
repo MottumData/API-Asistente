@@ -75,10 +75,12 @@ class ContentRequest(BaseModel):
     """Modelo para la solicitud de generación de contenido de la propuesta"""
     proposal_id: str
 
+
 class SaveContentRequest(BaseModel):
     """Modelo para la solicitud de guardado del contenido de la propuesta"""
     proposal_id: str
     content: Dict
+
 
 class TenderProposal(BaseModel):
     """Modelo para las propuestas de proyecto."""
@@ -205,7 +207,7 @@ async def upload_tdr(file: UploadFile = File(...), num_proposals: int = 5):
 
 @router.post('/related-projects/')
 def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool = False):
-    """ Obtiene X propuestas de proyecto a partir de los términos de referencia 
+    """ Obtiene X propuestas de proyecto a partir de los términos de referencia
         y la información extraída. """
 
     query = request.query
@@ -237,11 +239,13 @@ def make_concept_notes(request: ConceptNotesRequest):
     tdr_summary = request.tdr_summary
 
     logger.info('Creating proposal with ID: %s', proposal_id)
+    
     proposal = TenderProposal(proposal_id=proposal_id)
     proposal.set_information_sources(information_sources)
     proposal.set_tdr_summary(tdr_summary)
     proposals[proposal_id] = proposal  # Crea una nueva propuesta
-    
+    logger.info('Proposal created with ID: %s', proposal_id)
+
     logger.info('Generating concept notes for proposal: %s. Information sources: %s',
                 proposal_id, str(information_sources))
     information_source_docs = [load_document_chroma(source)
@@ -273,7 +277,9 @@ def save_concept_notes(request: SaveConceptNotesRequest):
 
     proposal_id = str(request.proposal_id)
     concept_notes = request.concept_notes
-    proposals[proposal_id].set_concept_notes(concept_notes)
+    proposal = proposals[proposal_id]
+    proposal.set_concept_notes(concept_notes)
+    proposals[proposal_id] = proposal
     return JSONResponse(status_code=200, content={"message": "Notas conceptuales guardadas con éxito."})
 
 
@@ -307,19 +313,36 @@ def save_index(request: SaveIndexRequest):
     """ Guarda el índice de un proyecto a partir de su ID. """
     proposal_id = str(request.proposal_id)
     index = request.index
-    proposals[proposal_id].set_index(index)
+    proposal = proposals[proposal_id]
+    proposal.set_index(index)
+    proposals[proposal_id] = proposal
     return JSONResponse(status_code=200, content={"message": "Índice guardado con éxito."})
+
 
 @router.post('/make-content/')
 def make_proposal_content(request: ContentRequest):
-
+    """ Genera el contenido de una propuesta a partir de su ID. """
     proposal = proposals[str(request.proposal_id)]
     concept_notes = proposal.get_concept_notes()
     tdr_summary = proposal.get_tdr_summary()
     index = proposal.get_index()
-    bussiness_information = load_document_chroma('CODEXCA - DOSSIER DIGITAL 2021.pdf')
-
-    json_template = load_prompt(prompt_name="make_content")
+    business_information = load_document_chroma(
+        'CODEXCA - DOSSIER DIGITAL 2021.pdf')
+    content = {}
+    json_template = load_prompt(prompt_name="project_writer")
+    for index, resume in index.items():
+        content_prompt = PromptTemplate(
+            template=(json_template),
+            input_variables=['index', 'description', 'concept_notes',
+                             'business_information', 'tdr_summary'],
+        )
+        chain = content_prompt | llm
+        logger.info('Generating content for proposal: %s. Index: %s/%s',
+                    proposal.get_proposal_id(), index, len(index))
+        response = chain.invoke(
+            {"index": index, "description": resume, "concept_notes": concept_notes, "business_information": business_information, "tdr_summary": tdr_summary})
+        content[index] = response.content
+    return JSONResponse({"content": content})
 
 
 @router.get('/proposal-trace/')
