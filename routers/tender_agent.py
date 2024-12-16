@@ -3,10 +3,10 @@
 import os
 import asyncio
 import logging
-from pydantic import BaseModel
 from typing import List, Dict
+from pydantic import BaseModel
 
-from langchain_core.output_parsers import JsonOutputParser, CommaSeparatedListOutputParser
+from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from openai import RateLimitError
@@ -58,6 +58,17 @@ class SaveConceptNotesRequest(BaseModel):
     """Modelo para la solicitud de concept notes."""
     proposal_id: str
     concept_notes: Dict
+
+
+class IndexRequest(BaseModel):
+    """Modelo para la solicitud del índice de la propuesta"""
+    proposal_id: str
+
+
+class SaveIndexRequest(BaseModel):
+    """Modelo para la solicitud de guardado del índice de la propuesta"""
+    proposal_id: str
+    index: Dict
 
 
 class TenderProposal(BaseModel):
@@ -212,16 +223,16 @@ def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool 
 def make_concept_notes(request: ConceptNotesRequest):
     """ Genera las notas conceptuales de un proyecto. """
 
-    proposal_id = request.proposal_id
+    proposal_id = str(request.proposal_id)
     information_sources = request.information_sources
     tdr_summary = request.tdr_summary
 
     logger.info('Creating proposal with ID: %s', proposal_id)
-    proposals[proposal_id] = TenderProposal(
-        proposal_id=proposal_id)  # Crea una nueva propuesta
-    proposal = proposals[proposal_id]
+    proposal = TenderProposal(proposal_id=proposal_id)
     proposal.set_information_sources(information_sources)
     proposal.set_tdr_summary(tdr_summary)
+    proposals[proposal_id] = proposal  # Crea una nueva propuesta
+    
     logger.info('Generating concept notes for proposal: %s. Information sources: %s',
                 proposal_id, str(information_sources))
     information_source_docs = [load_document_chroma(source)
@@ -251,15 +262,16 @@ def make_concept_notes(request: ConceptNotesRequest):
 def save_concept_notes(request: SaveConceptNotesRequest):
     """ Guarda las notas conceptuales de un proyecto a partir de su ID. """
 
-    proposal_id = request.proposal_id
+    proposal_id = str(request.proposal_id)
     concept_notes = request.concept_notes
     proposals[proposal_id].set_concept_notes(concept_notes)
     return JSONResponse(status_code=200, content={"message": "Notas conceptuales guardadas con éxito."})
 
 
-@router.get('/make-index/')
-def make_index(proposal_id):
+@router.post('/make-index/')
+def make_index(request: IndexRequest):
     """ Genera un índice de un proyecto. """
+    proposal_id = str(request.proposal_id)
     proposal = proposals[proposal_id]
     concept_notes = proposal.get_concept_notes()
     tdr_summary = proposal.get_tdr_summary()
@@ -282,8 +294,10 @@ def make_index(proposal_id):
 
 
 @router.post('/save-index/')
-def save_index(proposal_id: str, index: List[str]):
+def save_index(request: SaveIndexRequest):
     """ Guarda el índice de un proyecto a partir de su ID. """
+    proposal_id = str(request.proposal_id)
+    index = request.index
     proposals[proposal_id].set_index(index)
     return JSONResponse(status_code=200, content={"message": "Índice guardado con éxito."})
 
@@ -291,14 +305,11 @@ def save_index(proposal_id: str, index: List[str]):
 @router.get('/proposal-trace/')
 def get_proposal_trace(proposal_id: str):
     """ Obtiene el registro de una propuesta a partir de su ID."""
-    
-    raise HTTPException(status_code=503, detail="Este endpoint está en desarrollo. Por favor, inténtelo más tarde.")
-
-    # try:
-    #     proposal = proposals[proposal_id]
-    # except KeyError:
-    #     return JSONResponse(status_code=404, content={"message": "Código de propuesta no encontrado."})
-    # return JSONResponse(proposal.model_dump(mode='json'))
+    try:
+        proposal = proposals[proposal_id]
+    except KeyError:
+        return JSONResponse(status_code=404, content={"message": "Código de propuesta no encontrado."})
+    return JSONResponse(content=proposal.model_dump(mode='json'))
 
 
 @router.post("/upload-tdr-streaming/")
