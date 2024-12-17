@@ -11,14 +11,13 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from openai import RateLimitError
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
 from docx import Document
 import markdown2
 from bs4 import BeautifulSoup
-import pypandoc
 
 
 from ..internal.path_utils import TEMP_DIR, CHROMA_DB, CHROMA_COLLECTION
@@ -259,8 +258,6 @@ def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool 
     return related_docs
 
 # TODO - Rediseñar la forma en que se cargan los documentos de información.
-# TODO - Modificar la respuesta para que se devuelva un JSON con los documentos y sus fuentes.
-
 
 @router.post('/make-concept-note/')
 def make_concept_notes(request: ConceptNotesRequest):
@@ -420,8 +417,8 @@ async def set_proposal_title(request: SetTitleRequest):
 
 
 @router.post('/download-proposal/')
-async def download_proposal(request: DownloadProposalRequest):
-    """ Descarga una propuesta a partir de su ID. """
+async def download_proposal(request: DownloadProposalRequest, background_tasks: BackgroundTasks):
+    """ Descarga una propuesta en .docx a partir de su ID. """
     proposal_id = request.proposal_id
     proposal = proposals[proposal_id]
     title = proposal.get_title() if proposal.get_title() else proposal_id
@@ -452,6 +449,7 @@ async def download_proposal(request: DownloadProposalRequest):
                         paragraph.add_run(part.text)
     path = os.path.join(TEMP_DIR, f'{title}.docx')
     doc.save(path)
+    background_tasks.add_task(os.remove, path)
     return FileResponse(path, filename=f'{title}.docx',
                         media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
 
