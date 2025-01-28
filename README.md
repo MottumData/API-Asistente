@@ -44,6 +44,7 @@ LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
 LANGCHAIN_PROJECT="Your project name"
 UI_BASE_URL="Front URL"
 ```
+> ⚠️ **Importante:** Si decides no utilizar los servicios de Azure AI, es necesario modificar las llamadas al endpoint de OpenAI. El código requerido para realizar estos ajustes se encuentra comentado en los scripts `chat.py`, `rag_utils.py` y `tender_agent.py`.
 
 ### Despliegue local :computer:
 
