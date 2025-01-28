@@ -42,6 +42,7 @@ LANGCHAIN_API_KEY=XXXXXXXXXXXXXXXX
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
 LANGCHAIN_PROJECT="Your project name"
+UI_BASE_URL="Front URL"
 ```
 
 ### Despliegue local :computer:
