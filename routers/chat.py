@@ -31,12 +31,18 @@ conversations: Dict[str, BaseChatMessageHistory] = {}
 
 llm = AzureChatOpenAI(
     azure_deployment='gpt-4o',
-    api_version="2024-08-01-preview",
+    api_version="2024-10-01-preview",
     azure_endpoint=os.getenv("AZURE_ENDPOINT"),
     api_key=os.getenv("AZURE_API_KEY"),
     temperature=0.2  # Ajusta según tus necesidades
-
 )
+
+# Para el caso en el que se consuma directamente desde OpenAI
+# llm = ChatOpenAI(
+#     model="gpt-4o-mini",
+#     api_key=os.getenv("OPENAI_API_KEY") # Crear variable de entorno con la API Key de OpenAI
+# )
+
 
 embeddings = AzureOpenAIEmbeddings(
     model="LLM-Codexca_text-embedding-3-large",
@@ -45,6 +51,13 @@ embeddings = AzureOpenAIEmbeddings(
     azure_endpoint=os.getenv("AZURE_ENDPOINT"),
     api_version="2023-05-15"
 )
+
+# Para el caso en el que se consuma directamente desde OpenAI
+# embeddings = OpenAIEmbeddings(
+#     model="text-embedding-3-large",
+#     api_key=os.getenv("OPENAI_API_KEY") # Crear variable de entorno con la API Key de OpenAI
+# )
+
 vector_store = Chroma(embedding_function=embeddings,
                       persist_directory=CHROMA_DB,
                       collection_name=CHROMA_COLLECTION)

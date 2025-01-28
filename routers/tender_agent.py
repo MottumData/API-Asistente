@@ -34,8 +34,14 @@ llm = AzureChatOpenAI(
     azure_endpoint=os.getenv("AZURE_ENDPOINT"),
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     temperature=0.2  # Ajusta según tus necesidades
-
 )
+
+# Para el caso en el que se consuma directamente desde OpenAI
+# llm = ChatOpenAI(
+#     model="gpt-4o-mini",
+#     api_key=os.getenv("OPENAI_API_KEY") # Crear variable de entorno con la API Key de OpenAI
+# )
+
 
 embeddings = AzureOpenAIEmbeddings(
     model="LLM-Codexca_text-embedding-3-large",
@@ -145,12 +151,6 @@ class TenderProposal(BaseModel):
     def set_index(self, index: List[str]):
         self.index = index
 
-    # def get_key_ideas(self):
-    #     return self.key_ideas
-
-    # def set_key_ideas(self, key_ideas: str):
-    #     self.key_ideas = key_ideas
-
     def get_content(self):
         return self.content
 
@@ -256,8 +256,6 @@ def make_project_proposal(request: RelevantDocumentRequest, from_endpoint: bool 
     if from_endpoint:
         return JSONResponse({"related_projects": related_docs, "query": query})
     return related_docs
-
-# TODO - Rediseñar la forma en que se cargan los documentos de información.
 
 @router.post('/make-concept-note/')
 def make_concept_notes(request: ConceptNotesRequest):
@@ -424,17 +422,6 @@ async def download_proposal(request: DownloadProposalRequest, background_tasks: 
     title = proposal.get_title() if proposal.get_title() else proposal_id
     content = proposal.get_content()
     doc = Document()
-    # for _, text in content.items():
-    #     html = markdown2.markdown(text)
-    #     temp_html_path = os.path.join(TEMP_DIR, 'temp.html')
-    #     with open(temp_html_path, 'w', encoding='utf-8') as temp_html_file:
-    #         temp_html_file.write(html)
-    #     temp_docx_path = os.path.join(TEMP_DIR, 'temp.docx')
-    #     pypandoc.convert_file(
-    #         temp_html_path, 'docx', format='html', outputfile=temp_docx_path)
-    #     docx_content = Document(temp_docx_path)
-    #     for paragraph in docx_content.paragraphs:
-    #         doc.add_paragraph(paragraph.text)
     for _, text in content.items():
         html = markdown2.markdown(text)
         soup = BeautifulSoup(html, 'html.parser')
@@ -482,5 +469,3 @@ async def upload_tdr_streaming(file: UploadFile = File(...)):
         os.remove(temp_file_path)
 
     return StreamingResponse(generate(), media_type="application/json")
-
-# TODO - Implementar logica para proposal_id generalizado

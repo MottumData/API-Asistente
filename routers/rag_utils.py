@@ -15,7 +15,7 @@ from langchain_community.document_loaders import (
 )
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
+from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI, ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
 import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
@@ -44,9 +44,14 @@ llm = AzureChatOpenAI(
     api_version="2024-08-01-preview",
     azure_endpoint=os.getenv("AZURE_ENDPOINT"),
     api_key=os.getenv("AZURE_API_KEY"),
-    temperature=0.2  # Ajusta según tus necesidades
-
+    temperature=0.2
 )
+
+# Para el caso en el que se consuma directamente desde OpenAI
+# llm = ChatOpenAI(
+#     model="gpt-4o-mini",
+#     api_key=os.getenv("OPENAI_API_KEY") # Crear variable de entorno con la API Key de OpenAI
+# )
 
 
 embeddings = AzureOpenAIEmbeddings(
@@ -57,6 +62,11 @@ embeddings = AzureOpenAIEmbeddings(
     api_version="2023-05-15"
 )
 
+# Para el caso en el que se consuma directamente desde OpenAI
+# embeddings = OpenAIEmbeddings(
+#     model="text-embedding-3-large",
+#     api_key=os.getenv("OPENAI_API_KEY") # Crear variable de entorno con la API Key de OpenAI
+# )
 
 def save_file(file: UploadFile, directory: str) -> str:
     """Guarda el archivo en el directorio especificado."""
@@ -75,7 +85,7 @@ def delete_file(file_path: str) -> None:
 
 def insert_document_chroma(file_path: str):
     """Función para insertar un documento en la base de datos de Chroma."""
-    # TODO - Generación de metadatos solo disponible para PDF por el momento.
+    # Generación de metadatos solo disponible para PDF por el momento.
 
     if not any(file_path.endswith(ext) for ext in ALLOWED_EXTENSIONS):
         raise ValueError(

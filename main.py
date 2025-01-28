@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Carga de las variables de entorno
 load_dotenv()
 
-app = FastAPI(title="API de Asistente de IA de Codexca", version="0.0.1")
+app = FastAPI(title="API de Asistente de IA de Codexca", version="1.5.0")
 
 origins = [
     "http://localhost:8000",
